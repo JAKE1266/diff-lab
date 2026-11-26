@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>diff-lab</title>
+  <style>
+    :root{
+      --bg:#0a0b0f; --bg2:#12141a; --card:#151821; --card2:#1b1f2a;
+      --line:#252a36; --line2:#323847;
+      --fg:#e8eaf0; --dim:#8b93a7; --dimmer:#5d6478;
+      --accent:#6366f1; --ok:#22c55e; --err:#ef4444; --warn:#f59e0b;
+      --addbg:rgba(34,197,94,.12); --delbg:rgba(239,68,68,.12);
+      --r:14px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh}
+    header{border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:14px}
+    .logo{font-size:16px;font-weight:700}
+    .layout{max-width:1300px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+    .editors{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    textarea{background:var(--bg2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px;font:13px/1.6 ui-monospace,monospace;min-height:220px;resize:vertical;width:100%}
+    textarea:focus{outline:none;border-color:var(--accent)}
+    .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    button{font:inherit;font-weight:600;cursor:pointer;border:0;border-radius:9px;padding:9px 18px;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff}
+    button.ghost{background:var(--card2);border:1px solid var(--line2);color:var(--fg)}
+    select{background:var(--bg2);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font:inherit}
+    .badge{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px}
+    .badge.ok{background:rgba(34,197,94,.15);color:var(--ok)}
+    .badge.diff{background:rgba(245,158,11,.15);color:var(--warn)}
+    .badge.err{background:rgba(239,68,68,.15);color:var(--err)}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+    .panel-h{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dimmer);margin-bottom:10px}
+    pre.uni{font:12.5px/1.7 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
+    pre.uni .del{color:var(--err);background:var(--delbg);display:block}
+    pre.uni .ins{color:var(--ok);background:var(--addbg);display:block}
+    pre.uni .hdr{color:var(--accent);font-weight:700}
+    table{width:100%;border-collapse:collapse;font:12.5px/1.6 ui-monospace,monospace}
+    th{color:var(--dimmer);text-align:left;padding:6px 10px;border-bottom:1px solid var(--line2);font-size:11px}
+    td{padding:6px 10px;border-bottom:1px solid var(--line);word-break:break-all}
+    td.path{color:var(--accent)}
+    td.add{color:var(--ok)} td.remove{color:var(--err)} td.change{color:var(--warn)}
+    .sbs{display:grid;grid-template-columns:1fr 1fr;gap:0;font:12px/1.6 ui-monospace,monospace}
+    .sbs .l{padding:2px 8px;white-space:pre-wrap;word-break:break-all}
+    .sbs .left{border-right:1px solid var(--line);padding-right:6px}
+    .sbs .right{padding-left:6px}
+    .sbs .num{color:var(--dimmer);margin-right:8px;display:inline-block;width:34px;text-align:right}
+    .sbs .del{background:var(--delbg)} .sbs .ins{background:var(--addbg)}
+    .empty{color:var(--dimmer);padding:20px;text-align:center}
+    .errbox{background:rgba(239,68,68,.12);border:1px solid var(--err);border-radius:9px;padding:10px 14px;color:var(--err);font-size:13px}
+    .stats{display:flex;gap:14px;font-size:12px;color:var(--dim)}
+    .stats b{color:var(--fg)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🔀 diff-lab</div>
+    <span style="font-size:12px;color:var(--dimmer)">行级 LCS / JSON 语义对比,零依赖</span>
+  </header>
+
+  <div class="layout">
+    <div class="editors">
+      <textarea id="ta" placeholder="左侧文本(JSON 模式下须为合法 JSON)">{"name":"old","tags":["a","b"],"keep":true}</textarea>
+      <textarea id="tb" placeholder="右侧文本">{"name":"new","tags":["a","b","c"],"keep":true,"extra":1}</textarea>
+    </div>
+    <div class="bar">
+      <button id="goBtn">对比</button>
+      <select id="mode">
+        <option value="lines">行级 LCS</option>
+        <option value="json">JSON 语义</option>
+      </select>
+      <select id="ctx">
+        <option value="3">上下文 3 行</option>
+        <option value="0">上下文 0 行</option>
+        <option value="5">上下文 5 行</option>
+        <option value="10">上下文 10 行</option>
+      </select>
+      <span id="badge"></span>
+      <span id="statLine" class="stats"></span>
+    </div>
+    <div id="err" class="errbox" style="display:none"></div>
+
+    <div class="panel" id="uniPanel" style="display:none">
+      <div class="panel-h">统一 diff</div>
+      <pre class="uni" id="uniOut"></pre>
+    </div>
+    <div class="panel" id="sbsPanel" style="display:none">
+      <div class="panel-h">并排视图</div>
+      <div class="sbs" id="sbsOut"></div>
+    </div>
+    <div class="panel" id="jsonPanel" style="display:none">
+      <div class="panel-h">JSON 语义差异</div>
+      <table id="jsonTable"><thead><tr><th>路径</th><th>类型</th><th>旧值</th><th>新值</th></tr></thead><tbody id="jsonBody"></tbody></table>
+    </div>
+  </div>
+
+  <script>
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+    const fmtVal = (v) => (v === undefined ? '∅' : JSON.stringify(v))
+
+    async function run() {
+      const err = document.getElementById('err')
+      err.style.display = 'none'
+      const mode = document.getElementById('mode').value
+      try {
+        const res = await fetch('/api/diff', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            a: document.getElementById('ta').value,
+            b: document.getElementById('tb').value,
+            mode,
+            context: Number(document.getElementById('ctx').value),
+          }),
+        })
+        const d = await res.json()
+        if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`)
+        const badge = document.getElementById('badge')
+        badge.className = `badge ${d.hasDiff ? 'diff' : 'ok'}`
+        badge.textContent = d.hasDiff ? '有差异' : '完全一致'
+        document.getElementById('statLine').innerHTML = d.stats
+          ? `等 <b>${d.stats.equal}</b> · 删 <b>${d.stats.deletions}</b> · 增 <b>${d.stats.insertions}</b>`
+          : ''
+        document.getElementById('uniPanel').style.display = d.mode === 'lines' ? 'block' : 'none'
+        document.getElementById('sbsPanel').style.display = d.mode === 'lines' ? 'block' : 'none'
+        document.getElementById('jsonPanel').style.display = d.mode === 'json' ? 'block' : 'none'
+        if (d.mode === 'lines') {
+          document.getElementById('uniOut').innerHTML = (d.report || '完全一致')
+            .split('\n').map((l) => {
+              if (l.startsWith('@@')) return `<span class="hdr">${esc(l)}</span>`
+              if (l.startsWith('-')) return `<span class="del">${esc(l)}</span>`
+              if (l.startsWith('+')) return `<span class="ins">${esc(l)}</span>`
+              return esc(l)
+            }).join('\n')
+          document.getElementById('sbsOut').innerHTML = (d.side ?? []).map((row) => `
+            <div class="left"><span class="${row.left?.type ?? ''}">${row.left ? `<span class="num">${row.left.num}</span>${esc(row.left.text)}` : ''}</span></div>
+            <div class="right"><span class="${row.right?.type ?? ''}">${row.right ? `<span class="num">${row.right.num}</span>${esc(row.right.text)}` : ''}</span></div>
+          `).join('')
+        } else {
+          document.getElementById('jsonBody').innerHTML = d.ops.map((o) => `
+            <tr><td class="path">${esc(o.path)}</td><td class="${o.type}">${o.type === 'add' ? '+ 新增' : o.type === 'remove' ? '- 删除' : '~ 修改'}</td>
+            <td>${esc(fmtVal(o.a))}</td><td>${esc(fmtVal(o.b))}</td></tr>`).join('')
+            || '<tr><td colspan="4">完全一致</td></tr>'
+        }
+      } catch (e) {
+        err.textContent = e.message
+        err.style.display = 'block'
+      }
+    }
+    document.getElementById('goBtn').addEventListener('click', run)
+    run()
+  </script>
+</body>
+</html>

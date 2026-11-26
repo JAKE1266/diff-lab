@@ -1,0 +1,9 @@
+{
+  "name": "diff-lab",
+  "version": "0.1.0",
+  "description": "零依赖结构化 diff 工具:行级 LCS diff(统一/并排)、JSON 语义 diff(增删改路径),CLI + Web UI",
+  "type": "module",
+  "scripts": { "test": "node test/lcs.test.mjs && node test/json-diff.test.mjs && node test/server.test.mjs && node test/syntax.test.mjs" },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
