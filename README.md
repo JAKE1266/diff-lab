@@ -1,5 +1,9 @@
 # diff-lab
 
+[![CI](https://github.com/JAKE1266/diff-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/JAKE1266/diff-lab/actions/workflows/ci.yml)
+
+> 源码：<https://github.com/JAKE1266/diff-lab> · 安装：`npm i github:JAKE1266/diff-lab`（或直接克隆运行）
+
 零依赖**结构化 diff 工具**:行级 LCS diff(统一/并排视图)+ JSON 语义 diff(递归输出 增/删/改 路径)。纯 Node.js(≥18),CLI 与本地 Web UI 双入口。
 
 ## 快速开始
